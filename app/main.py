@@ -33,11 +33,15 @@ while True:
                                 password='fastapi',
                                 cursor_factory=RealDictCursor)
         # cursor = conn.cursor()
-        print('Database connection established')
+        logging.info('Database connection established!')
+        print('Database connection established!')
         break
-    except Error as err:
+    except Error as error:
+        logging.error('Connection failed!')
+        logging.error('DB connection error: %s', error)
+        logging.info('Retrying...')
         print('Connection failed!')
-        print(f'DB connection error: {err}')
+        print(f'DB connection error: {error}')
         print('Retrying....')
         time.sleep(4)
 
@@ -74,10 +78,10 @@ def create_post(post: Post):
                         post_dict['published']))
             # new_post = cur.fetchone()[0]
             new_post = cur.fetchone()
-    except (Exception, DatabaseError) as error:
-        logging.error(error)
+    except (Exception, DatabaseError) as ex:
+        logging.error(ex)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error) from error
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ex) from ex
 
     conn.commit()
 
@@ -88,15 +92,15 @@ def create_post(post: Post):
 
 
 @app.get("/posts", status_code=status.HTTP_200_OK)
-def get_posts():
+def get_posts(off_set: int = 0, limit: int = 10):
     """[summary]
       Retrieve all posts
     """
     qry = """
-    SELECT * FROM posts
+    SELECT * FROM posts OFFSET %s LIMIT %s;
     """
     with conn.cursor() as cur:
-        cur.execute(qry)
+        cur.execute(qry, (off_set, limit))
         posts = cur.fetchall()
     return {"data": posts}
 
@@ -113,10 +117,10 @@ def get_post(post_id: int):
         with conn.cursor() as cur:
             cur.execute(qry, (post_id, ))
             post = cur.fetchone()
-    except (Exception, DatabaseError) as error:
+    except (Exception, DatabaseError) as ex:
         logging.error('Get Post. post_id:%s does not exist!', post_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"DB Error: {error}") from error
+                            detail=f"DB Error: {ex}") from ex
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with post_id={post_id} was not found!")
@@ -139,9 +143,9 @@ def update_post(post_id: int, post: Post):
             cur.execute(
                 qry, (post_dict['title'], post_dict['content'], post_dict['published'], post_id))
             updated_post = cur.fetchone()
-    except (Exception, DatabaseError) as error:
+    except (Exception, DatabaseError) as ex:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'Error:{error}') from error
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'Error:{ex}') from ex
 
     conn.commit()
 
@@ -161,9 +165,9 @@ def delete_post(post_id: int):
     try:
         with conn.cursor() as cur:
             cur.execute(qry, (post_id,))
-    except (Exception, DatabaseError) as error:
+    except (Exception, DatabaseError) as ex:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error) from error
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ex) from ex
     conn.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
