@@ -14,8 +14,10 @@ import time
 
 import psycopg2
 from fastapi import FastAPI, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 from psycopg2.extras import RealDictCursor
 from psycopg2 import DatabaseError, Error
+# from starlette.responses import JSONResponse
 
 # import app.helper_functions as helper_func
 # from app.data.test_data import posts
@@ -57,26 +59,19 @@ def read_root():
     return {"message": "Hello to FastApi!"}
 
 
-@app.post("/posts", status_code=status.HTTP_201_CREATED)
+@app.post("/posts", status_code=status.HTTP_201_CREATED, response_class=JSONResponse)
 # or create_post(pay_load: dict = Body(...)):
 def create_post(post: Post):
     """
-    create a new post
+    Create a new post
     """
 
-    # print(f'Post(pydantic model) = {post}')
-    print(f'Post(python dict) = {post.dict()}')
-
-    post_dict = post.dict()
-    # Save new post
     qry = """
     INSERT INTO posts ("title", "content", "published") VALUES (%s, %s, %s) returning *;
     """
     try:
         with conn.cursor() as cur:
-            cur.execute(qry, (post_dict['title'], post_dict['content'],
-                        post_dict['published']))
-            # new_post = cur.fetchone()[0]
+            cur.execute(qry, (post.title, post.content, post.published))
             new_post = cur.fetchone()
     except (Exception, DatabaseError) as ex:
         logging.error(ex)
@@ -93,8 +88,9 @@ def create_post(post: Post):
 
 @app.get("/posts", status_code=status.HTTP_200_OK)
 def get_posts(off_set: int = 0, limit: int = 10):
-    """[summary]
-      Retrieve all posts
+    """
+      Retrieve all posts.
+      Allows for pagination
     """
     qry = """
     SELECT * FROM posts OFFSET %s LIMIT %s;
@@ -111,7 +107,7 @@ def get_post(post_id: int):
     Retrieve a specific post based on post_id
     """
     qry = """
-    SELECT * FROM posts WHERE id=%s
+    SELECT * FROM posts WHERE id=%s;
     """
     try:
         with conn.cursor() as cur:
@@ -123,7 +119,7 @@ def get_post(post_id: int):
                             detail=f"DB Error: {ex}") from ex
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Post with post_id={post_id} was not found!")
+                            detail=f"Post with post_id={post_id} was not found in the db!")
     return post
 
 
@@ -136,16 +132,19 @@ def update_post(post_id: int, post: Post):
     qry = """
     UPDATE posts SET title=%s, content=%s, published=%s WHERE id=%s returning *;
     """
-    post_dict = post.dict()
 
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                qry, (post_dict['title'], post_dict['content'], post_dict['published'], post_id))
+            cur.execute(qry, (post.title, post.content,
+                        post.published, post_id))
             updated_post = cur.fetchone()
     except (Exception, DatabaseError) as ex:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'Error:{ex}') from ex
+
+    if updated_post is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f'Post with id={post_id} does not exist in db!')
 
     conn.commit()
 
@@ -160,14 +159,20 @@ def delete_post(post_id: int):
     Delete a post
     """
     qry = """
-    DELETE FROM posts WHERE id=%s
+    DELETE FROM posts WHERE id=%s RETURNING *;
     """
     try:
         with conn.cursor() as cur:
             cur.execute(qry, (post_id,))
+            post = cur.fetchone()
     except (Exception, DatabaseError) as ex:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ex) from ex
+
     conn.commit()
+
+    if post is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f'Post with id={post_id} does not exist!')
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
