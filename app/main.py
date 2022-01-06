@@ -17,11 +17,11 @@ from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from psycopg2.extras import RealDictCursor
 from psycopg2 import DatabaseError, Error
-# from starlette.responses import JSONResponse
+from sqlalchemy import SqlAlchemy
 
 # import app.helper_functions as helper_func
 # from app.data.test_data import posts
-from app.models.post import Post
+from models_shemas import Post
 
 logging.basicConfig(filename='fastapi.log',
                     level=logging.DEBUG,
