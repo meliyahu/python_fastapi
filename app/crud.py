@@ -2,7 +2,9 @@
     Utility methods to implememnt CRUD
 """
 from sqlalchemy.orm import Session
-from .models_shemas import models, schemas
+
+from . import models
+from . import schemas
 
 # pylint: disable=invalid-name
 
@@ -98,4 +100,5 @@ def delete_post(db: Session, post_id: int):
         return None
 
     db.delete(db_post)
+    db.commit()
     return db_post

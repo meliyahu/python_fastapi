@@ -19,7 +19,7 @@ class PostBase(BaseModel):
     published: bool = True
 
 
-class PostCreate(BaseModel):
+class PostCreate(PostBase):
     """
     A create Post class
 
@@ -27,7 +27,13 @@ class PostCreate(BaseModel):
         BaseModel ([type]): [description]
     """
 
+class PostUpdate(PostBase):
+    """
+    Update post
 
+    Args:
+        PostBase ([type]): [description]
+    """
 class Post(PostBase):
     """
     A post pydantic class

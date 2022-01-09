@@ -1,4 +1,5 @@
-"""[summary]
+"""
+Api routes
 
     Raises:
         HTTPException: [description]
@@ -8,170 +9,108 @@
     Returns:
         [type]: [description]
     """
+# pylint: disable=invalid-name
+
 import logging
-import time
-# from random import randrange
+from typing import List
 
-import psycopg2
-from fastapi import FastAPI, HTTPException, Response, status
-from fastapi.responses import JSONResponse
-from psycopg2.extras import RealDictCursor
-from psycopg2 import DatabaseError, Error
-from sqlalchemy import SqlAlchemy
+from fastapi import Depends, FastAPI, HTTPException, Response, status
+from sqlalchemy.orm import Session
 
-# import app.helper_functions as helper_func
-# from app.data.test_data import posts
-from models_shemas import Post
+from . import crud, models, schemas
+from .database import SessionLocal, engine
 
 logging.basicConfig(filename='fastapi.log',
                     level=logging.DEBUG,
                     format='%(asctime)s:%(levelname)s:%(message)s')
+
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
-while True:
+
+
+# Dependency
+def get_db():
+    """
+    Dependency method to get db session
+    for each request and closed after each
+    request
+    Yields:
+        Session: db session
+    """
+    db = SessionLocal()
     try:
-        conn = psycopg2.connect(host='localhost',
-                                database='fastapi',
-                                user='fastapi',
-                                password='fastapi',
-                                cursor_factory=RealDictCursor)
-        # cursor = conn.cursor()
-        logging.info('Database connection established!')
-        print('Database connection established!')
-        break
-    except Error as error:
-        logging.error('Connection failed!')
-        logging.error('DB connection error: %s', error)
-        logging.info('Retrying...')
-        print('Connection failed!')
-        print(f'DB connection error: {error}')
-        print('Retrying....')
-        time.sleep(4)
+        yield db
+    finally:
+        db.close()
 
 
 @app.get("/")
 def read_root():
     """
-    [summary]
-
+    FastApi
     Returns:
-        [type]: [description]
+        JSON: Api greetings
     """
-    return {"message": "Hello to FastApi!"}
+    return {"message": "FastApi greets you profusely!"}
 
 
-@app.post("/posts", status_code=status.HTTP_201_CREATED, response_class=JSONResponse)
-# or create_post(pay_load: dict = Body(...)):
-def create_post(post: Post):
+@app.post("/posts", status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
+def create_post(post: schemas.PostCreate, db: Session = Depends(get_db)):
     """
     Create a new post
     """
 
-    qry = """
-    INSERT INTO posts ("title", "content", "published") VALUES (%s, %s, %s) returning *;
-    """
-    try:
-        with conn.cursor() as cur:
-            cur.execute(qry, (post.title, post.content, post.published))
-            new_post = cur.fetchone()
-    except (Exception, DatabaseError) as ex:
-        logging.error(ex)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ex) from ex
-
-    conn.commit()
-
-    return {
-        "message": "Post created successfully",
-        "post": new_post
-    }
+    return crud.create_post(db=db, post=post)
 
 
-@app.get("/posts", status_code=status.HTTP_200_OK)
-def get_posts(off_set: int = 0, limit: int = 10):
+@app.get("/posts", status_code=status.HTTP_200_OK, response_model=List[schemas.Post])
+def get_posts(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     """
       Retrieve all posts.
       Allows for pagination
     """
-    qry = """
-    SELECT * FROM posts OFFSET %s LIMIT %s;
-    """
-    with conn.cursor() as cur:
-        cur.execute(qry, (off_set, limit))
-        posts = cur.fetchall()
-    return {"data": posts}
+    posts = crud.get_posts(db=db, skip=skip, limit=limit)
+    return posts
 
 
-@app.get("/posts/{post_id}", status_code=status.HTTP_200_OK)
-def get_post(post_id: int):
+@app.get("/posts/{post_id}", status_code=status.HTTP_200_OK, response_model=schemas.Post)
+def get_post(post_id: int, db: Session = Depends(get_db)):
     """
     Retrieve a specific post based on post_id
     """
-    qry = """
-    SELECT * FROM posts WHERE id=%s;
-    """
-    try:
-        with conn.cursor() as cur:
-            cur.execute(qry, (post_id, ))
-            post = cur.fetchone()
-    except (Exception, DatabaseError) as ex:
-        logging.error('Get Post. post_id:%s does not exist!', post_id)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"DB Error: {ex}") from ex
+    post = crud.get_post(db=db, post_id=post_id)
     if post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Post with post_id={post_id} was not found in the db!")
+                            detail=f"Post with post_id={post_id} does not exist in db!")
     return post
 
 
 @ app.put("/posts/{post_id}", status_code=status.HTTP_200_OK)
-def update_post(post_id: int, post: Post):
+def update_post(post_id: int, post: schemas.PostUpdate, db: Session = Depends(get_db)):
     """
     Update a post
     """
 
-    qry = """
-    UPDATE posts SET title=%s, content=%s, published=%s WHERE id=%s returning *;
-    """
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute(qry, (post.title, post.content,
-                        post.published, post_id))
-            updated_post = cur.fetchone()
-    except (Exception, DatabaseError) as ex:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'Error:{ex}') from ex
+    updated_post = crud.update_post(db=db, post=post, post_id=post_id)
 
     if updated_post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f'Post with id={post_id} does not exist in db!')
-
-    conn.commit()
 
     return {"message": "Post has been updated",
             "post": updated_post
             }
 
 
-@app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(post_id: int):
+@ app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(post_id: int, db: Session = Depends(get_db)):
     """
     Delete a post
     """
-    qry = """
-    DELETE FROM posts WHERE id=%s RETURNING *;
-    """
-    try:
-        with conn.cursor() as cur:
-            cur.execute(qry, (post_id,))
-            post = cur.fetchone()
-    except (Exception, DatabaseError) as ex:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=ex) from ex
+    deleted_post = crud.delete_post(db=db, post_id=post_id)
 
-    conn.commit()
-
-    if post is None:
+    if deleted_post is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f'Post with id={post_id} does not exist!')
 
