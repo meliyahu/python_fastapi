@@ -18,7 +18,7 @@ from fastapi import Depends, FastAPI, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from . import crud, models, schemas
-from .database import SessionLocal, engine
+from .database import engine, get_db
 
 logging.basicConfig(filename='fastapi.log',
                     level=logging.DEBUG,
@@ -29,22 +29,6 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 
-# Dependency
-def get_db():
-    """
-    Dependency method to get db session
-    for each request and closed after each
-    request
-    Yields:
-        Session: db session
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 @app.get("/")
 def read_root():
     """
@@ -52,7 +36,7 @@ def read_root():
     Returns:
         JSON: Api greetings
     """
-    return {"message": "FastApi greets you profusely!"}
+    return {"message": "FastApi live!"}
 
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED, response_model=schemas.Post)

@@ -20,3 +20,22 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+# Dependency
+
+# pylint: disable=invalid-name
+
+
+def get_db():
+    """
+    Dependency method to get db session
+    for each request and closed after each
+    request
+    Yields:
+        Session: db session
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
