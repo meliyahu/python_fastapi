@@ -2,7 +2,6 @@
     Utility methods to implememnt CRUD
 """
 from sqlalchemy.orm import Session
-
 from . import models
 from . import schemas
 
@@ -19,13 +18,13 @@ def create_post(db: Session, post: schemas.PostCreate):
     Returns:
         Post: the newly created post
     """
-    # db_post = models.Post(
+    # update_post = models.Post(
     #     title=post.title, content=post.content, published=post.published)
-    db_post = models.Post(**post.dict())
-    db.add(db_post)
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
     db.commit()
-    db.refresh(db_post)
-    return db_post
+    db.refresh(new_post)
+    return new_post
 
 
 def get_posts(db: Session, skip: int = 0, limit: int = 10):
@@ -67,20 +66,21 @@ def update_post(db: Session, post: schemas.Post, post_id: int):
         post_id (int): [description]
     """
     # 1. Retrieve post from db
-    db_post = db.query(models.Post).filter(models.Post.id == post_id).first()
-    if db_post is None:
+    updated_post = db.query(models.Post).filter(
+        models.Post.id == post_id).first()
+    if updated_post is None:
         return None
 
     # 2. Update post fields
-    db_post.title = post.title
-    db_post.content = post.content
-    db_post.published = post.published
+    updated_post.title = post.title
+    updated_post.content = post.content
+    updated_post.published = post.published
 
     # 3. Save post in db
     # db.flush()
     db.commit()
-    db.refresh(db_post)
-    return db_post
+    db.refresh(updated_post)
+    return updated_post
 
 
 def delete_post(db: Session, post_id: int):
@@ -94,11 +94,79 @@ def delete_post(db: Session, post_id: int):
     Returns:
         Post: delete post or None if post is not in db
     """
-    db_post = db.query(models.Post).filter(models.Post.id == post_id).first()
+    deleted_post = db.query(models.Post).filter(
+        models.Post.id == post_id).first()
 
-    if db_post is None:
+    if deleted_post is None:
         return None
 
-    db.delete(db_post)
+    db.delete(deleted_post)
     db.commit()
-    return db_post
+    return deleted_post
+
+
+def create_user(db: Session, user: schemas.User):
+    """
+    Create user
+
+    Args:
+        db (Session): [description]
+        user (schemas.User): [description]
+    """
+    # Check if user exists
+    db_user = db.query(models.User).filter(
+        models.User.email == user.email).first()
+    if db_user is not None:
+        return None
+
+    db_user = models.User(**user.dict())
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def get_users(db: Session, skip: int = 0, limit=10):
+    """
+    Retrieve list of users
+
+    Args:
+        db (Session): [description]
+        skip (int, optional): [description]. Defaults to 0.
+        limit (int, optional): [description]. Defaults to 10.
+
+    Returns:
+        [type]: [description]
+    """
+    return db.query(models.User).offset(skip).limit(limit).all()
+
+
+def get_user(db: Session, user_id: int):
+    """
+    Get single users
+
+    Args:
+        db (Session): [description]
+        user_id (int): [description]
+    """
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    return user
+
+
+def delete_user(db: Session, user_id):
+    """
+    Delete user
+
+    Args:
+        db (Session): [description]
+        user_id ([type]): [description]
+    """
+    user = db.query(models.User).filter(
+        models.User.id == user_id).first()
+
+    if user is None:
+        return None
+
+    db.delete(user)
+    db.commit()
+    return user
