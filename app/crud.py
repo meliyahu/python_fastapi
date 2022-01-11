@@ -2,8 +2,8 @@
     Utility methods to implememnt CRUD
 """
 from sqlalchemy.orm import Session
-from . import models
-from . import schemas
+
+from . import models, schemas, utils
 
 # pylint: disable=invalid-name
 
@@ -119,6 +119,8 @@ def create_user(db: Session, user: schemas.User):
     if db_user is not None:
         return None
 
+    # hash the password
+    user.password = utils.hash_pswd(user.password)
     db_user = models.User(**user.dict())
     db.add(db_user)
     db.commit()
@@ -170,3 +172,16 @@ def delete_user(db: Session, user_id):
     db.delete(user)
     db.commit()
     return user
+
+
+def user_login(db: Session, user: schemas.UserLogin):
+    """
+    For user login
+
+    Args:
+        db (Session): [description]
+        user (schemas.UserLogin): [description]
+    """
+    db_user = db.query(models.User).filter(
+        models.User.email == user.email).first()
+    return db_user

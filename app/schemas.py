@@ -7,7 +7,7 @@
 # pylint: disable=no-self-argument
 # from typing import Any
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class PostBase(BaseModel):
@@ -61,12 +61,21 @@ class UserBase(BaseModel):
     Args:
         BaseModel ([type]): [description]
     """
-    email: str
+    email: EmailStr
 
 
 class UserCreate(UserBase):
     """
     Create user schema
+
+    Args:
+        UserBase ([type]): [description]
+    """
+    password: str
+
+class UserLogin(UserBase):
+    """
+    Login user schema
 
     Args:
         UserBase ([type]): [description]
